@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models\Traits;
+namespace theoLuirard\TreeStructuredRelation\Traits;
 
 use App\Models\Relations\BelongsToManyTreeRelation;
 use App\Models\Relations\HasManyTreeRelation;

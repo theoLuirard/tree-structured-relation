@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models\Relations;
+namespace theoLuirard\TreeStructuredRelation\Relations;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
