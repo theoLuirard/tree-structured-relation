@@ -4,9 +4,11 @@ namespace theoLuirard\TreeStructuredRelation\Traits;
 
 use App\Models\Relations\BelongsToManyTreeRelation;
 use App\Models\Relations\HasManyTreeRelation;
+use Error;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Database\Eloquent\Model;
 
 /*
 |--------------------------------------------------------------------------
@@ -357,6 +359,88 @@ trait HasTreeStructure
         return $extracting_child_id_sql;
     }
 
+    /**
+     * Determine if the model is a root node
+     * 
+     * @return bool
+     */
+    public function isRoot()
+    {
+        return $this->{$this->getParentColumnName()} === null;
+    }
+
+    /**
+     * Determine if the model is a leaf node (has no children)
+     * 
+     * @return bool
+     */
+    public function isLeaf()
+    {
+        return $this->children->isEmpty();
+    }
+
+
+    /**
+     * Determine if the model is a child of the current model based on the parent_id
+     * @param \Illuminate\Database\Eloquent\Model $model
+     * @return bool
+     */
+    public function isSiblingOf(Model $model)
+    {
+        return $this->{$this->getParentColumnName()} === $model->{$this->getParentColumnName()};
+    }
+
+    /**
+     * Determine if the model provided is a parent of the current model based on the path
+     * @param \Illuminate\Database\Eloquent\Model $model
+     * @return bool
+     */
+    public function isAncestorOf(Model $model)
+    {
+        $pathColumnName = $this->getPathColumnName();
+        $pathSeparator = $this->getPathSeparator();
+
+        $pattern = '/^(?:' . preg_quote($this->$pathColumnName . $pathSeparator, $pathSeparator) . ')/';
+
+        return preg_match($pattern, $model->$pathColumnName);
+    }
+
+    /**
+     * Determine if the model provided is the direct parent of the current model
+     * 
+     * @param \Illuminate\Database\Eloquent\Model $model
+     * @return bool
+     */
+    public function isParentOf(Model $model)
+    {
+        return $model->{$this->getParentColumnName()} === $this->getKey();
+    }
+
+    /**
+     * Determine if the model provided is a child of the current model based on the path
+     * @param \Illuminate\Database\Eloquent\Model $model
+     * @return bool
+     */
+    public function isDescendantOf(Model $model)
+    {
+        $pathColumnName = $this->getPathColumnName();
+        $pathSeparator = $this->getPathSeparator();
+
+        $pattern = '/^(?:' . preg_quote($model->$pathColumnName . $pathSeparator, $pathSeparator) . ')/';
+
+        return preg_match($pattern, $this->$pathColumnName);
+    }
+
+    /**
+     * Determine if the model provided is the direct child of the current model
+     * 
+     * @param \Illuminate\Database\Eloquent\Model $model
+     * @return bool
+     */
+    public function isChildOf(Model $model)
+    {
+        return $this->{$this->getParentColumnName()} === $model->getKey();
+    }
 
     /*
     |--------------------------------------------------------------------------
