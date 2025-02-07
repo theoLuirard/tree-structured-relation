@@ -67,38 +67,56 @@ class BelongsToManyTreeRelation extends Relation
         $pathColumnName = $this->parent->getPathColumnName();
         $pathSeparator = $this->parent->getPathSeparator();
 
-        /* Map path values and keep only the longest (from the same parents), we try to reduce the number of where clause */
-        $longestsPaths = [];
-        collect($this->getKeys($models, $pathColumnName))->sortDesc()->each(function ($path) use (&$longestsPaths) {
+        // Map path values and keep only the shortests (from the same parents), 
+        // we try to reduce the number of where clause 
+        $shortestPaths = $this->mapShorthenedPath($models);
+
+        // Create where clauses 
+        $this->query->where(function (Builder $query) use ($shortestPaths, $pathColumnName, $pathSeparator) {
+            foreach ($shortestPaths as $index => $path) {
+                if ($index == 0) {
+                    $query->whereRaw(" `$pathColumnName` LIKE CONCAT( ? ,'$pathSeparator%') ");
+                } else {
+                    $query->orWhereRaw(" `$pathColumnName` LIKE CONCAT( ? ,'$pathSeparator%') ");
+                }
+
+                $query->getQuery()->addBinding($path);
+            }
+        });
+    }
+
+    /**
+     * Map the shortened paths of an array of model.
+     *
+     * @param  array  $models
+     * @return array
+     */
+    public function mapShorthenedPath(array $models)
+    {
+        $pathColumnName = $this->parent->getPathColumnName();
+        $pathSeparator = $this->parent->getPathSeparator();
+
+        $shortenedPaths = [];
+        collect($this->getKeys($models, $pathColumnName))->sort()->each(function ($path) use (&$shortenedPaths, $pathSeparator) {
 
             // isChild -> false until $path is an child of a stored path 
             $isChild = false;
 
-            $pattern = "/^(?:" . preg_quote($path, "/") . ")/";
-            foreach ($longestsPaths as $longestsPath) {
-                if (preg_match($pattern, $longestsPath) === 1) {
+            // Check if the current path is a child of a stored path
+            foreach ($shortenedPaths as $shortestPath) {
+                $pattern = "/^(?:" . preg_quote($shortestPath, $pathSeparator) . ")/";
+                if (preg_match($pattern, $path) === 1) {
                     $isChild = true;
                 };
             }
 
             // If not matching any stored path, we add it to the stored path
             if (!$isChild) {
-                array_push($longestsPaths, $path);
+                array_push($shortenedPaths, $path);
             }
         });
 
-        // Create where clauses 
-        $this->query->where(function (Builder $query) use ($longestsPaths, $pathColumnName, $pathSeparator) {
-            foreach ($longestsPaths as $index => $path) {
-                if ($index == 0) {
-                    $query->whereRaw(" ? LIKE CONCAT(`$pathColumnName`,'$pathSeparator%') ");
-                } else {
-                    $query->orWhereRaw(" ? LIKE CONCAT(`$pathColumnName`,'$pathSeparator%') ");
-                }
-
-                $query->getQuery()->addBinding($path);
-            }
-        });
+        return $shortenedPaths;
     }
 
     /**
@@ -127,28 +145,16 @@ class BelongsToManyTreeRelation extends Relation
      */
     public function match(array $models, Collection $results, $relation)
     {
-        // Get path column name & path separator
-        $pathColumnName = $this->parent->getPathColumnName();
-        $pathSeparator = $this->parent->getPathSeparator();
-
-        // If not results, we can directly return our children wihtout adding parent
         if ($results->isEmpty()) {
             return $models;
         }
-
-        // We should say for every $models (repesenting a child) if a result is a parent or not
-        foreach ($models as $key => $model) {
-
+        
+        foreach ($models as $model) {
             $model->setRelation(
                 $relation,
-                $results->filter(function (Model $result) use ($model, $pathColumnName, $pathSeparator) {
-
-                    // Look if their path matchs together by looking if the child path is an extension of the parent 
-                    $childPath = $model->$pathColumnName;
-                    $parentPath = $result->$pathColumnName;
-                    $pattern = '/^(?:' . preg_quote($parentPath . $pathSeparator, '/') . ')/'; // we take care of adding the path separator because it could match a different parent otherwise
-                    return preg_match($pattern, $childPath);
-                })->sortBy($pathColumnName)->values()
+                $results->filter(function (Model $result) use ($model) {
+                    return $result->isChildOf($model);
+                })->sortBy($this->parent->getPathColumnName())->values()
             );
         }
 
