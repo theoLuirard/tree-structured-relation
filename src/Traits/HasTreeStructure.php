@@ -1,12 +1,14 @@
 <?php
 
-namespace App\Models\Traits;
+namespace theoLuirard\TreeStructuredRelation\Traits;
 
 use App\Models\Relations\BelongsToManyTreeRelation;
 use App\Models\Relations\HasManyTreeRelation;
+use Error;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Database\Eloquent\Model;
 
 /*
 |--------------------------------------------------------------------------
@@ -39,33 +41,33 @@ trait HasTreeStructure
      * 
      * @var string
      */
-    public static string $parent_column_name = 'parent_id';
+    public string $parent_column_name = 'parent_id';
 
     /**
      * The path column name 
      * 
      * @var string
      */
-    public static string $path_column_name = 'path';
+    public string $path_column_name = 'path';
 
     /**
      * The separator used in path 
      * 
      * @var string 
      */
-    public static string $path_separator = '/';
+    public string $path_separator = '/';
 
     /**
      * The property name used in explicit path 
      * 
      * @var string 
      */
-    public static string $property_for_explicit_path = 'name';
+    public string $property_for_explicit_path = 'name';
 
     /**
      * The explicit_path column name, if this column is not in the table, it will be computed
      */
-    public static ?string $explicit_path_column_name = null;
+    public ?string $explicit_path_column_name = null;
 
     /**
      * The table alias name used in relation
@@ -165,16 +167,16 @@ trait HasTreeStructure
     {
 
         // Getting current path
-        $current_path = $this->path;
+        $current_path = $this->getPathValue();
         $current_path_length = strlen($current_path);
 
         // If parent path is not set, we refresh it
-        if (isset($this->parent) && $this->parent->path === null) {
+        if (isset($this->parent) && $this->parent->getPathValue() === null) {
             $this->parent->refreshPath();
         }
 
         // Compute new path
-        $new_path = (isset($this->parent) ? $this->parent->path : '') . $this->getPathSeparator() . $this->getKey();
+        $new_path = (isset($this->parent) ? $this->parent->getPathValue() : '') . $this->getPathSeparator() . $this->getKey();
 
         // getting table and column names
         $path_column_name = $this->getPathColumnName();
@@ -211,6 +213,8 @@ trait HasTreeStructure
             );
         }
 
+        // Do we need to update children path ?
+        // If the path has been updated, we need to update children path
         $this->children->each(function ($child) use ($new_path, $path_column_name, &$counter) {
             $counter += $child->updatePath();
         });
@@ -268,11 +272,14 @@ trait HasTreeStructure
      */
     public static function computeAllPath()
     {
-        $table = self::getTableName();
-        $path_column_name = self::$path_column_name;
-        $parent_column_name = self::$parent_column_name;
-        $path_separator = self::$path_separator;
-        $id_column_name = self::keyName();
+
+        $t = new static;
+        $table = $t->getTableName();
+        $path_column_name = $t->getPathColumnName();
+        $parent_id_column_name = $t->getParentColumnName();
+        $path_separator = $t->getPathSeparator();
+        $id_column_name = $t->getKeyName();
+
 
         // remove all path 
         DB::table($table)->update([$path_column_name => null]);
@@ -280,7 +287,7 @@ trait HasTreeStructure
 
         // set path for root item
         $affected_rows = 0;
-        $affected_rows += DB::table($table)->whereNull($parent_column_name)->update(
+        $affected_rows += DB::table($table)->whereNull($parent_id_column_name)->update(
             [$path_column_name => DB::raw(" `$id_column_name` ")]
         );
 
@@ -289,7 +296,7 @@ trait HasTreeStructure
         $limit_until_infinite_loop = 32;
         while (DB::table($table)->whereNull($path_column_name)->exists() || $iterator > $limit_until_infinite_loop) {
             $affected_rows += DB::table($table . ' as enfant')
-                ->leftJoin($table . ' as parent', "parent.$id_column_name", '=', "enfant.$parent_column_name")
+                ->leftJoin($table . ' as parent', "parent.$id_column_name", '=', "enfant.$parent_id_column_name")
                 ->whereNotNull("parent.$path_column_name")
                 ->whereNull("enfant.$path_column_name")
                 ->update(["enfant.$path_column_name" => DB::raw("concat( parent.`$path_column_name`, '$path_separator' ,enfant.`$id_column_name`)")]);
@@ -344,14 +351,96 @@ trait HasTreeStructure
      */
     public static function extractingRootIdFromAnyChildrenPathSql(string $alias = null): string
     {
-        $path_column_name = self::$path_column_name;
-        $separator = self::$path_separator;
+        $path_column_name = with(new static)->getPathColumnName();
+        $separator =  with(new static)->getPathSeparator();
         $start = 1; // 1 -> because we looking for root node (be aware if seperator is added at the begining of the path we should recalculate the start) and because MySQL is 1 indented
         $alias = $alias ?? with(new static)->getTable();
         $extracting_child_id_sql = "SUBSTRING( $alias.`$path_column_name`, $start , LOCATE('$separator', CONCAT($alias.`$path_column_name`, '$separator'), $start) - $start)";
         return $extracting_child_id_sql;
     }
 
+    /**
+     * Determine if the model is a root node
+     * 
+     * @return bool
+     */
+    public function isRoot()
+    {
+        return $this->{$this->getParentColumnName()} === null;
+    }
+
+    /**
+     * Determine if the model is a leaf node (has no children)
+     * 
+     * @return bool
+     */
+    public function isLeaf()
+    {
+        return $this->children->isEmpty();
+    }
+
+
+    /**
+     * Determine if the model is a child of the current model based on the parent_id
+     * @param \Illuminate\Database\Eloquent\Model $model
+     * @return bool
+     */
+    public function isSiblingOf(Model $model)
+    {
+        return $this->{$this->getParentColumnName()} === $model->{$this->getParentColumnName()};
+    }
+
+    /**
+     * Determine if the model provided is a parent of the current model based on the path
+     * @param \Illuminate\Database\Eloquent\Model $model
+     * @return bool
+     */
+    public function isAncestorOf(Model $model)
+    {
+        $pathColumnName = $this->getPathColumnName();
+        $pathSeparator = $this->getPathSeparator();
+
+        $pattern = '/^(?:' . preg_quote($this->$pathColumnName . $pathSeparator, $pathSeparator) . ')/';
+
+        return preg_match($pattern, $model->$pathColumnName);
+    }
+
+    /**
+     * Determine if the model provided is the direct parent of the current model
+     * 
+     * @param \Illuminate\Database\Eloquent\Model $model
+     * @return bool
+     */
+    public function isParentOf(Model $model)
+    {
+        return $model->{$this->getParentColumnName()} === $this->getKey();
+    }
+
+    /**
+     * Determine if the model provided is a child of the current model based on the path
+     * @param \Illuminate\Database\Eloquent\Model $model
+     * @return bool
+     */
+    public function isDescendantOf(Model $model)
+    {
+        $pathColumnName = $this->getPathColumnName();
+        $pathSeparator = $this->getPathSeparator();
+
+        $pattern = '/^(?:' . preg_quote($model->$pathColumnName . $pathSeparator, $pathSeparator) . ')/';
+
+        return preg_match($pattern, $this->$pathColumnName);
+    }
+
+    /**
+     * Determine if the model provided is the direct child of the current model
+     * 
+     * @param \Illuminate\Database\Eloquent\Model $model
+     * @return bool
+     */
+    public function isChildOf(Model $model)
+    {
+        return $this->{$this->getParentColumnName()} === $model->getKey();
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -371,7 +460,7 @@ trait HasTreeStructure
      */
     public function getPathSeparator()
     {
-        return self::$path_separator;
+        return $this->path_separator;
     }
 
     /**
@@ -381,7 +470,7 @@ trait HasTreeStructure
      */
     public function getPathColumnName()
     {
-        return self::$path_column_name;
+        return $this->path_column_name;
     }
 
     /**
@@ -401,7 +490,7 @@ trait HasTreeStructure
      */
     public function getParentColumnName()
     {
-        return self::$parent_column_name;
+        return $this->parent_column_name;
     }
 
     /**
@@ -411,9 +500,14 @@ trait HasTreeStructure
      */
     public function getExplicitPathColumnName()
     {
-        return self::$explicit_path_column_name;
+        return $this->explicit_path_column_name;
     }
 
+    /**
+     * Determine if the model has an explicit path column name
+     * 
+     * @return bool
+     */
     public function hasExplicitPathColumnName()
     {
         return $this->getExplicitPathColumnName() !== null;
@@ -426,7 +520,7 @@ trait HasTreeStructure
      */
     public function getPropertyForExplicitPath()
     {
-        return self::$property_for_explicit_path;
+        return $this->property_for_explicit_path;
     }
 
 
@@ -453,20 +547,7 @@ trait HasTreeStructure
                 } else {
                     $explicitPath = "";
                     $property_for_explicit_path = $this->getPropertyForExplicitPath();
-                    $that = $this;
-                    Log::info(
-                        "hummm" .
-                            $this->parents->reduce(
-                                function ($acc, $item, $index) use ($property_for_explicit_path) {
-                                    Log::info("pparent  " . $index . " is " . $item->$property_for_explicit_path . "");
-                                    $acc .= "parent  " . $index . " is " . $item->$property_for_explicit_path;
-                                },
-                                " "
-                            )
-                    );
-                    $this->parents->each(function ($item, $index) use (&$explicitPath, $property_for_explicit_path, $that) {
-
-                        Log::info("parent " . $index . " for " . $that->property_for_explicit_path . "is " . $item->$property_for_explicit_path);
+                    $this->parents->each(function ($item, $index) use (&$explicitPath, $property_for_explicit_path) {
                         $explicitPath .= ($index > 0 ? $this->getPathSeparator() : "") . $item->$property_for_explicit_path;
                     });
                     $explicitPath .= ($explicitPath !== "" ? $this->getPathSeparator() : '') . $this->$property_for_explicit_path;
@@ -485,7 +566,7 @@ trait HasTreeStructure
     {
         return new Attribute(
             get: function () {
-                return substr_count($this->path, $this->getPathSeparator());
+                return substr_count($this->getPathValue(), $this->getPathSeparator()) - 1;
             },
         );
     }
