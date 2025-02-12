@@ -274,6 +274,21 @@ $category1->isChildOf($category2); // True if $category1 parent_id is $category2
 $category1->isDescendantOf($category2);// True if $category1 is a children (even not a direct children) of $category 2
 ```
 
+The trait define some methods to set parent and direct children
+
+```php
+
+$category1->setAsChildOf($category2); // Define $category1 as a direct children of $category2
+
+$category1->setAsParentOf($category2); // Define $category1 as the parent of $category2
+
+$category->setAsRoot(); // Define $category as a root node
+
+$category->setAsChildOf(null); // Alias of $category->setAsRoot();
+
+```
+
+
 The trait also define methods to update the path
 
 ```php
