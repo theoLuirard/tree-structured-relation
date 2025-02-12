@@ -167,7 +167,7 @@ namespace App\Models;
 use App\Models\Traits\HasTreeStructure;
 use Illuminate\Database\Eloquent\Model;
 
-class Domaine extends Model
+class Category extends Model
 {
     use HasTreeStructure;
 

@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class BelongsToManyTreeRelation extends Relation
 {
@@ -245,8 +244,6 @@ class BelongsToManyTreeRelation extends Relation
         if (count($models) > 0) {
             $models = $builder->eagerLoadRelations($models);
         }
-
-        Log::info("models", [$models]);
 
         return $this->related->newCollection($models)->sortBy($this->parent->getPathColumnName())->values();
     }

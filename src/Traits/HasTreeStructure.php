@@ -2,13 +2,13 @@
 
 namespace theoLuirard\TreeStructuredRelation\Traits;
 
-use App\Models\Relations\BelongsToManyTreeRelation;
-use App\Models\Relations\HasManyTreeRelation;
 use Error;
+use theoLuirard\TreeStructuredRelation\Relations\BelongsToManyTreeRelation;
+use theoLuirard\TreeStructuredRelation\Relations\HasManyTreeRelation;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Model;
+use theoLuirard\TreeStructuredRelation\Exceptions\CircularTreeRelationException;
 
 /*
 |--------------------------------------------------------------------------
@@ -305,13 +305,7 @@ trait HasTreeStructure
         }
 
         if ($iterator > $limit_until_infinite_loop + 1) {
-            $message = "An infinite loop has been detected in a tree structured Model";
-            Log::critical($message, [
-                "CLASS" => self::class,
-                "LINE" => __LINE__,
-                "FILE" => __FILE__
-            ]);
-            throw new Error($message);
+            throw new CircularTreeRelationException(new static);
         }
 
         return $affected_rows;
@@ -441,6 +435,58 @@ trait HasTreeStructure
     {
         return $this->{$this->getParentColumnName()} === $model->getKey();
     }
+
+    /**
+     * Set the current model as the child of the provided model (or root if nothing provided)
+     * 
+     * @param \Illuminate\Database\Eloquent\Model $model
+     * @return \Illuminate\Database\Eloquent\Model
+     */
+    public function setAsChildOf(?Model $model)
+    {
+        if(!isset($model)) {
+            return $this->setAsRoot();
+        }
+
+        if($this->isAncestorOf($model)){
+            throw new CircularTreeRelationException($this);
+        }
+        $this->{$this->getParentColumnName()} = $model->getKey();
+        $model->save();
+        $this->refreshPath();
+        return $this;
+    }
+
+    /**
+     * Set the current model as the parent of the provided model
+     * 
+     * @param \Illuminate\Database\Eloquent\Model $model
+     * @return \Illuminate\Database\Eloquent\Model
+     */
+    public function setAsParentOf(Model $model)
+    {
+        if($model->isAncestorOf($this)){
+            throw new CircularTreeRelationException($this);
+        }
+        $model->{$this->getParentColumnName()} = $this->getKey();
+        $model->save();
+        $model->refreshPath();
+        return $this;
+    }
+
+    /**
+     * Set the current model as a root node 
+     * 
+     * @return \Illuminate\Database\Eloquent\Model
+     */
+    public function setAsRoot()
+    {
+        $this->{$this->getParentColumnName()} = null;
+        $this->refreshPath();
+        return $this;
+    }
+
+
 
     /*
     |--------------------------------------------------------------------------
