@@ -3,8 +3,9 @@
     "description": "A package that adds a trait to the Laravel Model class and extends the Laravel Relation class with two new types of relations.",
     "license": "MIT",
     "require": {
-        "php": "^7.3|^8.0",
-        "laravel/framework": "^8.0|^9.0|^10.0|^11.0"
+        "php": ">=7.3",
+        "illuminate/database": "^8.0|^9.0|^10.0|^11.0",
+        "illuminate/support": "^8.0|^9.0|^10.0|^11.0"
     },
     "autoload": {
         "psr-4": {
@@ -23,5 +24,7 @@
         }
     ],
     "minimum-stability": "dev",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "keywords": [],
+    "type": "library"
 }
