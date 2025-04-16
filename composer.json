@@ -4,7 +4,7 @@
     "license": "MIT",
     "require": {
         "php": ">=7.3",
-        "laravel/laravel": "^8.0|^9.0|^10.0|^11.0|^12.0",
+        "laravel/framework": "^8.0|^9.0|^10.0|^11.0|^12.0",
         "theoluirard/laravel-get-table-name": "^1.0"
     },
     "autoload": {
