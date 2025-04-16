@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "9775900d030a0678b04716259dfe1b2e",
+    "content-hash": "1a69882ffd1d22b31ed35424b9ba92c6",
     "packages": [
         {
             "name": "brick/math",
@@ -1056,16 +1056,16 @@
         },
         {
             "name": "laravel/framework",
-            "version": "v12.9.1",
+            "version": "v12.9.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/framework.git",
-                "reference": "7c201749cc4b463eea1b58698f5fb4f4c09dc32b"
+                "reference": "3db59aa0f382c349c78a92f3e5b5522e00e3301b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/framework/zipball/7c201749cc4b463eea1b58698f5fb4f4c09dc32b",
-                "reference": "7c201749cc4b463eea1b58698f5fb4f4c09dc32b",
+                "url": "https://api.github.com/repos/laravel/framework/zipball/3db59aa0f382c349c78a92f3e5b5522e00e3301b",
+                "reference": "3db59aa0f382c349c78a92f3e5b5522e00e3301b",
                 "shasum": ""
             },
             "require": {
@@ -1267,7 +1267,7 @@
                 "issues": "https://github.com/laravel/framework/issues",
                 "source": "https://github.com/laravel/framework"
             },
-            "time": "2025-04-16T12:02:03+00:00"
+            "time": "2025-04-16T15:44:19+00:00"
         },
         {
             "name": "laravel/laravel",
@@ -5571,16 +5571,16 @@
         },
         {
             "name": "theoluirard/laravel-get-table-name",
-            "version": "v1.0.0",
+            "version": "v1.0.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/theoLuirard/get-table-name.git",
-                "reference": "a9afc9e3ae994c09c420a40773d68e6862e6cf19"
+                "reference": "a449d12bb9c19103e90976233faf2a09f402d27a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/theoLuirard/get-table-name/zipball/a9afc9e3ae994c09c420a40773d68e6862e6cf19",
-                "reference": "a9afc9e3ae994c09c420a40773d68e6862e6cf19",
+                "url": "https://api.github.com/repos/theoLuirard/get-table-name/zipball/a449d12bb9c19103e90976233faf2a09f402d27a",
+                "reference": "a449d12bb9c19103e90976233faf2a09f402d27a",
                 "shasum": ""
             },
             "require": {
@@ -5601,9 +5601,9 @@
             "description": "A package that adds a trait to the Laravel Model class and extends the Laravel Relation class with two new types of relations.",
             "support": {
                 "issues": "https://github.com/theoLuirard/get-table-name/issues",
-                "source": "https://github.com/theoLuirard/get-table-name/tree/v1.0.0"
+                "source": "https://github.com/theoLuirard/get-table-name/tree/v1.0.1"
             },
-            "time": "2025-04-16T15:28:15+00:00"
+            "time": "2025-04-16T15:59:00+00:00"
         },
         {
             "name": "tijsverkoyen/css-to-inline-styles",
