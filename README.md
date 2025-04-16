@@ -14,7 +14,7 @@ This package provides a way to manage tree-structured data relations in your app
 To install the package, use the following command:
 
 ```bash
-npm install tree-structured-relation
+composer require theoluirard/tree-structured-relation
 ```
 
 ## What to expects
@@ -98,7 +98,7 @@ Simply add the trait to your model definition
 
 namespace App\Models;
 
-use App\Models\Traits\HasTreeStructure;
+use theoLuirard\laravelGetTableName\Traits\HasTreeStructure;;
 use Illuminate\Database\Eloquent\Model;
 
 class Domaine extends Model
