@@ -225,8 +225,6 @@ trait HasTreeStructure
 
     public function updatePathAndExplicitPath()
     {
-        // TO DO
-        throw new Error("Not implemented yet");
 
         // Getting current path & explicit path
         $current_path = $this->path;
@@ -280,27 +278,52 @@ trait HasTreeStructure
         $parent_id_column_name = $t->getParentColumnName();
         $path_separator = $t->getPathSeparator();
         $id_column_name = $t->getKeyName();
+        $hasExplicitPathColumnName = $t->hasExplicitPathColumnName();
+        $explicit_path_column_name = $t->getExplicitPathColumnName();
+        $property_for_explicit_path = $t->getPropertyForExplicitPath();
 
 
         // remove all path 
-        DB::table($table)->update([$path_column_name => null]);
+        $pathToRemove = [
+            $path_column_name => null
+        ];
+        if ($hasExplicitPathColumnName) {
+            $pathToRemove[$explicit_path_column_name] = null;
+        }
+        DB::table($table)->update($pathToRemove);
 
 
         // set path for root item
         $affected_rows = 0;
-        $affected_rows += DB::table($table)->whereNull($parent_id_column_name)->update(
-            [$path_column_name => DB::raw(" `$id_column_name` ")]
-        );
+        $pathRoot = [
+            $path_column_name => DB::raw(" CONCAT( '$path_separator' ,`$id_column_name`)")
+        ];
+        if ($t->hasExplicitPathColumnName()) {
+            $pathRoot[$explicit_path_column_name] = DB::raw(" CONCAT( '$path_separator'  , `$property_for_explicit_path`) ");
+        }
+        $affected_rows += DB::table($table)->whereNull($parent_id_column_name)->update($pathRoot);
 
         // Compute path for direct child (that do not has path) of parent that has path
         $iterator = 0;
         $limit_until_infinite_loop = 32;
+
+        // Prepare the update path
+        $update_path = [
+            "enfant." . $path_column_name => DB::raw("concat( parent.`$path_column_name`, '$path_separator' ,enfant.`$id_column_name`) ")
+        ];
+        if ($hasExplicitPathColumnName) {
+            $update_path["enfant." . $explicit_path_column_name] = DB::raw("concat( parent.`$explicit_path_column_name`, '$path_separator' ,enfant.`$property_for_explicit_path`) ");
+        }
+
+        // While there is still child that do not have path
         while (DB::table($table)->whereNull($path_column_name)->exists() || $iterator > $limit_until_infinite_loop) {
+
+            // Update path for direct child (that do not has path) of parent that has path
             $affected_rows += DB::table($table . ' as enfant')
                 ->leftJoin($table . ' as parent', "parent.$id_column_name", '=', "enfant.$parent_id_column_name")
                 ->whereNotNull("parent.$path_column_name")
                 ->whereNull("enfant.$path_column_name")
-                ->update(["enfant.$path_column_name" => DB::raw("concat( parent.`$path_column_name`, '$path_separator' ,enfant.`$id_column_name`)")]);
+                ->update($update_path);
 
             $iterator++;
         }
@@ -311,6 +334,7 @@ trait HasTreeStructure
 
         return $affected_rows;
     }
+
 
     /*
     |--------------------------------------------------------------------------
@@ -555,7 +579,7 @@ trait HasTreeStructure
      * 
      * @return string
      */
-    public function getExplicitPathColumnName() : string
+    public function getExplicitPathColumnName(): string
     {
         return property_exists($this, 'explicit_path_column_name') ? $this->explicit_path_column_name : $this->default_explicit_path_column_name;
     }
@@ -565,7 +589,7 @@ trait HasTreeStructure
      * 
      * @return bool
      */
-    public function hasExplicitPathColumnName() : bool
+    public function hasExplicitPathColumnName(): bool
     {
         return $this->getExplicitPathColumnName() !== null;
     }
@@ -575,7 +599,7 @@ trait HasTreeStructure
      * 
      * @return string
      */
-    public function getExplicitPathValue() : string 
+    public function getExplicitPathValue(): string
     {
         return $this->{$this->getExplicitPathColumnName()};
     }
@@ -585,7 +609,7 @@ trait HasTreeStructure
      * 
      * @return string
      */
-    public function getPropertyForExplicitPath() : string
+    public function getPropertyForExplicitPath(): string
     {
         return property_exists($this, 'property_for_explicit_path') ? $this->property_for_explicit_path : $this->default_property_for_explicit_path;
     }
@@ -593,11 +617,11 @@ trait HasTreeStructure
     /**
      * 
      */
-    public static function getDeepestDepth() : int
+    public static function getDeepestDepth(): int
     {
-        $instance = with(new static); 
-        $pathSeparator = $instance->getPathSeparator();
-        $pathColumnName = $instance->getPathColumnName();
+        $t = with(new static);
+        $pathSeparator = $t->getPathSeparator();
+        $pathColumnName = $t->getPathColumnName();
         $occurenceSQL = "(LENGTH($pathColumnName) - LENGTH(REPLACE($pathColumnName, '$pathSeparator', ''))) / LENGTH('$pathSeparator')";
         return intval(static::selectRaw($occurenceSQL . ' as occurences')->orderBy('occurences', 'desc')->first()->occurences ?? 0);
     }
