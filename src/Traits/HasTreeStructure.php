@@ -8,6 +8,7 @@ use theoLuirard\TreeStructuredRelation\Relations\HasManyTreeRelation;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Model;
+use theoLuirard\getTableName\Traits\GetTableName;
 use theoLuirard\TreeStructuredRelation\Exceptions\CircularTreeRelationException;
 
 /*
@@ -26,7 +27,7 @@ use theoLuirard\TreeStructuredRelation\Exceptions\CircularTreeRelationException;
 trait HasTreeStructure
 {
 
-
+    use GetTableName;
     /*
     |--------------------------------------------------------------------------
     | Constants
@@ -353,6 +354,16 @@ trait HasTreeStructure
         return $extracting_child_id_sql;
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Hierchical Methods
+    |--------------------------------------------------------------------------
+    |
+    | Methods used to get and set hierchical informations
+    |
+    */
+
     /**
      * Determine if the model is a root node
      * 
@@ -444,11 +455,11 @@ trait HasTreeStructure
      */
     public function setAsChildOf(?Model $model)
     {
-        if(!isset($model)) {
+        if (!isset($model)) {
             return $this->setAsRoot();
         }
 
-        if($this->isAncestorOf($model)){
+        if ($this->isAncestorOf($model)) {
             throw new CircularTreeRelationException($this);
         }
         $this->{$this->getParentColumnName()} = $model->getKey();
@@ -465,7 +476,7 @@ trait HasTreeStructure
      */
     public function setAsParentOf(Model $model)
     {
-        if($model->isAncestorOf($this)){
+        if ($model->isAncestorOf($this)) {
             throw new CircularTreeRelationException($this);
         }
         $model->{$this->getParentColumnName()} = $this->getKey();
@@ -569,6 +580,13 @@ trait HasTreeStructure
         return $this->property_for_explicit_path;
     }
 
+    public static function getDeepestDepth() {
+        $instance = with(new static); 
+        $pathSeparator = $instance->getPathSeparator();
+        $pathColumnName = $instance->getPathColumnName();
+        $occurenceSQL = "(LENGTH($pathColumnName) - LENGTH(REPLACE($pathColumnName, '$pathSeparator', ''))) / LENGTH('$pathSeparator')";
+        return intval(static::selectRaw($occurenceSQL . ' as occurences')->orderBy('occurences', 'desc')->first()->occurences ?? 0);
+    }
 
     /*
     |--------------------------------------------------------------------------
