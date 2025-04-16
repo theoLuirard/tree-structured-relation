@@ -42,33 +42,33 @@ trait HasTreeStructure
      * 
      * @var string
      */
-    public string $parent_column_name = 'parent_id';
+    private string $default_parent_column_name = 'parent_id';
 
     /**
      * The path column name 
      * 
      * @var string
      */
-    public string $path_column_name = 'path';
+    private string $default_path_column_name = 'path';
 
     /**
      * The separator used in path 
      * 
      * @var string 
      */
-    public string $path_separator = '/';
+    private string $default_path_separator = '/';
 
     /**
      * The property name used in explicit path 
      * 
      * @var string 
      */
-    public string $property_for_explicit_path = 'name';
+    private string $default_property_for_explicit_path = 'name';
 
     /**
      * The explicit_path column name, if this column is not in the table, it will be computed
      */
-    public ?string $explicit_path_column_name = null;
+    private ?string $default_explicit_path_column_name = null;
 
     /**
      * The table alias name used in relation
@@ -255,7 +255,7 @@ trait HasTreeStructure
         return DB::update(
             "update `$table`
             set `$path_column_name` = concat( :new_path , substr( `$path_column_name`, $current_path_length + 1)),
-            `$explicit_path_column_name` = concat( :explicit_path , substr( `$path_column_name`, $current_explicit_path_lengt + 1))
+            `$explicit_path_column_name` = concat( :explicit_path , substr( `$path_column_name`, $current_explicit_path_length + 1))
             where `$path_column_name` = :current_path OR `$path_column_name` LIKE :child_path",
             [
                 'new_path' => $new_path,
@@ -517,7 +517,7 @@ trait HasTreeStructure
      */
     public function getPathSeparator()
     {
-        return $this->path_separator;
+        return property_exists($this, 'path_separator') ? $this->path_separator : $this->default_path_separator;
     }
 
     /**
@@ -527,7 +527,7 @@ trait HasTreeStructure
      */
     public function getPathColumnName()
     {
-        return $this->path_column_name;
+        return property_exists($this, 'path_column_name') ? $this->path_column_name : $this->default_path_column_name;
     }
 
     /**
@@ -547,7 +547,7 @@ trait HasTreeStructure
      */
     public function getParentColumnName()
     {
-        return $this->parent_column_name;
+        return property_exists($this, 'parent_column_name') ? $this->parent_column_name : $this->default_parent_column_name;
     }
 
     /**
@@ -555,9 +555,9 @@ trait HasTreeStructure
      * 
      * @return string
      */
-    public function getExplicitPathColumnName()
+    public function getExplicitPathColumnName() : string
     {
-        return $this->explicit_path_column_name;
+        return property_exists($this, 'explicit_path_column_name') ? $this->explicit_path_column_name : $this->default_explicit_path_column_name;
     }
 
     /**
@@ -565,9 +565,19 @@ trait HasTreeStructure
      * 
      * @return bool
      */
-    public function hasExplicitPathColumnName()
+    public function hasExplicitPathColumnName() : bool
     {
         return $this->getExplicitPathColumnName() !== null;
+    }
+
+    /**
+     * Get explicit path value
+     * 
+     * @return string
+     */
+    public function getExplicitPathValue() : string 
+    {
+        return $this->{$this->getExplicitPathColumnName()};
     }
 
     /**
@@ -575,12 +585,16 @@ trait HasTreeStructure
      * 
      * @return string
      */
-    public function getPropertyForExplicitPath()
+    public function getPropertyForExplicitPath() : string
     {
-        return $this->property_for_explicit_path;
+        return property_exists($this, 'property_for_explicit_path') ? $this->property_for_explicit_path : $this->default_property_for_explicit_path;
     }
 
-    public static function getDeepestDepth() {
+    /**
+     * 
+     */
+    public static function getDeepestDepth() : int
+    {
         $instance = with(new static); 
         $pathSeparator = $instance->getPathSeparator();
         $pathColumnName = $instance->getPathColumnName();
@@ -607,7 +621,7 @@ trait HasTreeStructure
         return new Attribute(
             get: function () {
                 if ($this->hasExplicitPathColumnName()) {
-                    return $this->{$this->getExplicitPathColumnName()};
+                    return $this->getExplicitPathValue();
                 } else {
                     $explicitPath = "";
                     $property_for_explicit_path = $this->getPropertyForExplicitPath();
