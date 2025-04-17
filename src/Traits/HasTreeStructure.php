@@ -126,12 +126,29 @@ trait HasTreeStructure
     }
 
     /**
+     * Alias of children()
+     * @return \App\Models\Relations\HasTreeRelation
+     */
+    public function descendants()
+    {
+        return $this->children();
+    }
+
+    /**
      * Get all parents relation
      * @return \App\Models\Relations\BelongsToTreeRelation
      */
     public function parents()
     {
         return new BelongsToManyTreeRelation($this);
+    }
+
+    /**
+     * Alias of parents()
+     * @return \App\Models\Relations\BelongsToTreeRelation
+     */
+    public function ancestors() {
+        return $this->parents();
     }
 
 
