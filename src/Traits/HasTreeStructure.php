@@ -594,9 +594,9 @@ trait HasTreeStructure
     /**
      * Get explicit path column name
      * 
-     * @return string
+     * @return ?string
      */
-    public function getExplicitPathColumnName(): string
+    public function getExplicitPathColumnName(): ?string
     {
         return property_exists($this, 'explicit_path_column_name') ? $this->explicit_path_column_name : $this->default_explicit_path_column_name;
     }
@@ -618,7 +618,7 @@ trait HasTreeStructure
      */
     public function getExplicitPathValue(): string
     {
-        return $this->{$this->getExplicitPathColumnName()};
+        return $this->${$this->getExplicitPathColumnName()};
     }
 
     /**
@@ -653,21 +653,21 @@ trait HasTreeStructure
     */
 
     /**
-     * Determine the explicite path, with name and not the id 
+     * Determine the explicit path, with name and not the id 
      *
      * @return \Illuminate\Database\Eloquent\Casts\Attribute
      */
     protected function explicitPath(): Attribute
     {
         return new Attribute(
-            get: function () {
+            get: function ($value) {
                 if ($this->hasExplicitPathColumnName()) {
-                    return $this->getExplicitPathValue();
+                    return $value;
                 } else {
                     $explicitPath = "";
                     $property_for_explicit_path = $this->getPropertyForExplicitPath();
                     $this->parents->each(function ($item, $index) use (&$explicitPath, $property_for_explicit_path) {
-                        $explicitPath .= ($index > 0 ? $this->getPathSeparator() : "") . $item->$property_for_explicit_path;
+                        $explicitPath .= $this->getPathSeparator() . $item->$property_for_explicit_path;
                     });
                     $explicitPath .= ($explicitPath !== "" ? $this->getPathSeparator() : '') . $this->$property_for_explicit_path;
                     return $explicitPath;
