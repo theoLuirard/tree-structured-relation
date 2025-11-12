@@ -270,12 +270,14 @@ trait HasTreeStructure
         return DB::update(
             "update `$table`
             set `$path_column_name` = concat( :new_path , substr( `$path_column_name`, $current_path_length + 1)),
-            `$explicit_path_column_name` = concat( :explicit_path , substr( `$path_column_name`, $current_explicit_path_length + 1))
+            `$explicit_path_column_name` = concat( :explicit_path , substr( `$explicit_path_column_name`, $current_explicit_path_length + 1))
             where `$path_column_name` = :current_path OR `$path_column_name` LIKE :child_path",
             [
                 'new_path' => $new_path,
                 'current_path' => $current_path,
-                'child_path' => $current_path . $this->getPathSeparator() . '%'
+                'child_path' => $current_path . $this->getPathSeparator() . '%',
+                'explicit_path' => $new_explicit_path
+
             ]
         );
     }
