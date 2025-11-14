@@ -2,7 +2,6 @@
 
 namespace theoLuirard\TreeStructuredRelation\Traits;
 
-use Error;
 use theoLuirard\TreeStructuredRelation\Relations\BelongsToManyTreeRelation;
 use theoLuirard\TreeStructuredRelation\Relations\HasManyTreeRelation;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -147,7 +146,8 @@ trait HasTreeStructure
      * Alias of parents()
      * @return \App\Models\Relations\BelongsToTreeRelation
      */
-    public function ancestors() {
+    public function ancestors()
+    {
         return $this->parents();
     }
 
@@ -179,107 +179,81 @@ trait HasTreeStructure
     /**
      * Update the path using the parent path and update himself path and their children path
      * 
+     * @param bool $updateChildren Determine if we need to update children path
      * @return int
      */
-    public function updatePath()
+    public function updatePath(bool $updateChildren = true)
     {
 
         // Getting current path
         $current_path = $this->getPathValue();
-        $current_path_length = strlen($current_path);
+        $path_column_name = $this->getPathColumnName();
+        $counter = 0;
+
 
         // If parent path is not set, we refresh it
         if (isset($this->parent) && $this->parent->getPathValue() === null) {
-            $this->parent->refreshPath();
+            $counter += $this->parent->updatePath(false);
         }
 
         // Compute new path
         $new_path = (isset($this->parent) ? $this->parent->getPathValue() : '') . $this->getPathSeparator() . $this->getKey();
 
-        // getting table and column names
-        $path_column_name = $this->getPathColumnName();
-        $table = $this->getTableName();
-
-        // If path is the same, we do nothing
-        if ($current_path === $new_path) {
-            return 0;
-        }
-
-        if ($current_path === null) {
-            // Update path
-            $keyName = $this->getKeyName();
-            $counter = DB::update(
-                "update `$table`
-                set `$path_column_name` = :new_path
-                where `$path_column_name` IS NULL AND `$keyName` = :primary_key_value ;",
-                [
-                    'primary_key_value' => $this->getKey(),
-                    'new_path' => $new_path
-                ]
-            );
-        } else {
-            // Update path
-            $counter = DB::update(
-                "update `$table`
-            set `$path_column_name` = concat( :new_path , substr( `$path_column_name`, $current_path_length + 1))
-            where `$path_column_name` = :current_path OR `$path_column_name` LIKE :child_path ;",
-                [
-                    'new_path' => $new_path,
-                    'current_path' => $current_path,
-                    'child_path' => $current_path . $this->getPathSeparator() . '%'
-                ]
-            );
+        // Update current model path
+        if ($current_path !== $new_path) {
+            $this->$path_column_name = $new_path;
+            $this->save();
+            ++$counter;
         }
 
         // Do we need to update children path ?
-        // If the path has been updated, we need to update children path
-        $this->children->each(function ($child) use ($new_path, $path_column_name, &$counter) {
-            $counter += $child->updatePath();
+        if ($updateChildren === false) {
+            return $counter;
+        }
+
+        // Update children path
+        $this->children->each(function ($child) use (&$counter, $updateChildren) {
+            $counter += $child->updatePath($updateChildren);
         });
 
         return $counter;
     }
 
-    public function updatePathAndExplicitPath()
+    /**
+     * Update the path and explicit path using the parent path and update himself path and their children path
+     * 
+     * @return int The number of affected rows
+     */
+    public function updatePathAndExplicitPath(bool $updateChildren = true): int
     {
+        // Getting column names
+        $path_column_name = $this->getPathColumnName();
+        $explicit_path_column_name = $this->getExplicitPathColumnName();
+        $property_for_explicit_path = $this->getPropertyForExplicitPath();
 
-        // Getting current path & explicit path
-        $current_path = $this->path;
-        $current_path_length = strlen($current_path);
-        $current_explicit_path = $this->explicit_path;
-        $current_explicit_path_length = strlen($this->explicit_path);
+        $counter = 0; // We count the current model
 
         // If parent path is not set, we refresh it
-        if (isset($this->parent) && ($this->parent->path === null || $this->parent->explicit_path === null)) {
-            $this->parent->refreshPath();
+        if (isset($this->parent) && ($this->parent->$path_column_name === null || $this->parent->$explicit_path_column_name === null)) {
+            $counter += $this->parent->updatePathAndExplicitPath(false);
         }
 
         // Compute new path & explicit path
-        $new_path = (isset($this->parent) ? $this->parent->path : '') . $this->getPathSeparator() . $this->name;
-        $new_explicit_path = (isset($this->parent) ? $this->parent->explicit_path : '') . $this->getPathSeparator() . $this->name;
+        $new_path = (isset($this->parent) ? $this->parent->$path_column_name : '') . $this->getPathSeparator() . $this->getKey();
+        $new_explicit_path = (isset($this->parent) ? $this->parent->$explicit_path_column_name : '') . $this->getPathSeparator() . $this->$property_for_explicit_path;
 
-        // getting table and column names
-        $path_column_name = $this->getPathColumnName();
-        $explicit_path_column_name = $this->getExplicitPathColumnName();
-        $table = $this->getTableName();
+        $this->$path_column_name = $new_path;
+        $this->$explicit_path_column_name = $new_explicit_path;
+        $this->save();
 
-        if ($current_path === $new_path  && $current_explicit_path === $new_explicit_path) {
-            return 0;
+        if ($updateChildren) {
+            // Update children path & explicit path
+            $this->direct_children()->each(function ($child) use (&$counter) {
+                $counter += $child->updatePathAndExplicitPath(true);
+            });
         }
 
-        return DB::update(
-            "update `$table`
-            set `$path_column_name` = concat( :new_path , substr( `$path_column_name`, $current_path_length + 1)),
-            `$explicit_path_column_name` = concat( :explicit_path , substr( `$explicit_path_column_name`, $current_explicit_path_length + 1))
-            where `$path_column_name` = :current_path OR `$path_column_name` LIKE :child_path",
-            [
-                'new_path' => $new_path,
-                'current_path' => $current_path,
-                'child_path' => $current_path . $this->getPathSeparator() . '%',
-                'explicit_path' => $new_explicit_path
-
-            ]
-        );
+        return $counter;
     }
 
 
@@ -614,13 +588,13 @@ trait HasTreeStructure
     }
 
     /**
-     * Get explicit path value
+     * Get explicit path value stored as db attribute
      * 
      * @return string
      */
     public function getExplicitPathValue(): string
     {
-        return $this->${$this->getExplicitPathColumnName()};
+        return $this->attributes[$this->getExplicitPathColumnName()];
     }
 
     /**
@@ -663,17 +637,19 @@ trait HasTreeStructure
     {
         return new Attribute(
             get: function ($value) {
-                if ($this->hasExplicitPathColumnName()) {
-                    return $value;
-                } else {
-                    $explicitPath = "";
-                    $property_for_explicit_path = $this->getPropertyForExplicitPath();
-                    $this->parents->each(function ($item, $index) use (&$explicitPath, $property_for_explicit_path) {
-                        $explicitPath .= $this->getPathSeparator() . $item->$property_for_explicit_path;
-                    });
-                    $explicitPath .= ($explicitPath !== "" ? $this->getPathSeparator() : '') . $this->$property_for_explicit_path;
-                    return $explicitPath;
+
+                if ($this->hasExplicitPathColumnName()) { // Is stored in db
+                    return $this->getExplicitPathValue();
                 }
+
+                // Should be computed
+                $explicitPath = "";
+                $property_for_explicit_path = $this->getPropertyForExplicitPath();
+                $this->parents->each(function ($item, $index) use (&$explicitPath, $property_for_explicit_path) {
+                    $explicitPath .= $this->getPathSeparator() . $item->$property_for_explicit_path;
+                });
+                $explicitPath .=  $this->getPathSeparator() . $this->$property_for_explicit_path;
+                return $explicitPath;
             },
         );
     }
